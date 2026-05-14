@@ -56,3 +56,8 @@ export type PlatformTask = {
   issue?: string;
   updatedAt: string;
 };
+
+export type TaskDetail = {
+  task: Task;
+  platforms: PlatformTask[];
+};

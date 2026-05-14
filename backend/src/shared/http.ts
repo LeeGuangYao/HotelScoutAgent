@@ -11,9 +11,15 @@ export type ApiErrorEnvelope = {
   requestId?: string;
 };
 
+export const ok = <TData>(data: TData): ApiEnvelope<TData> => ({ data });
+
+export const apiError = (code: string, message: string): ApiErrorEnvelope => ({
+  error: { code, message },
+});
+
 export const notImplemented = (moduleName: string): ApiErrorEnvelope => ({
   error: {
     code: 'NOT_IMPLEMENTED',
-    message: `${moduleName} is a stage-4 skeleton and will be implemented in a later stage.`,
+    message: `${moduleName} is not implemented in the current stage.`,
   },
 });
