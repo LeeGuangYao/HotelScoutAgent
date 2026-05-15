@@ -1,4 +1,10 @@
-import type { ManualVerificationContext, PlatformCode, SearchCriteria, TaskDetail, TaskResults } from '@/types/task';
+import type {
+  ManualVerificationContext,
+  PlatformCode,
+  SearchCriteria,
+  TaskDetail,
+  TaskResults,
+} from "@/types/task";
 
 type ApiEnvelope<TData> = {
   data: TData;
@@ -12,19 +18,25 @@ type ApiErrorEnvelope = {
 };
 
 const parseResponse = async <TData>(response: Response): Promise<TData> => {
-  const payload = (await response.json().catch(() => ({}))) as ApiEnvelope<TData> & ApiErrorEnvelope;
+  const payload = (await response
+    .json()
+    .catch(() => ({}))) as ApiEnvelope<TData> & ApiErrorEnvelope;
 
   if (!response.ok) {
-    throw new Error(payload.error?.message ?? `请求失败：HTTP ${response.status}`);
+    throw new Error(
+      payload.error?.message ?? `请求失败：HTTP ${response.status}`,
+    );
   }
 
   return payload.data;
 };
 
-export const createTask = async (criteria: SearchCriteria): Promise<TaskDetail> => {
-  const response = await fetch('/api/tasks', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+export const createTask = async (
+  criteria: SearchCriteria,
+): Promise<TaskDetail> => {
+  const response = await fetch("/api/tasks", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(criteria),
   });
   return parseResponse<TaskDetail>(response);
@@ -36,19 +48,28 @@ export const getTaskDetail = async (taskId: string): Promise<TaskDetail> => {
 };
 
 export const pauseTask = async (taskId: string): Promise<TaskDetail> => {
-  const response = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/pause`, { method: 'POST' });
+  const response = await fetch(
+    `/api/tasks/${encodeURIComponent(taskId)}/pause`,
+    { method: "POST" },
+  );
   return parseResponse<TaskDetail>(response);
 };
 
 export const resumeTask = async (taskId: string): Promise<TaskDetail> => {
-  const response = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/resume`, { method: 'POST' });
+  const response = await fetch(
+    `/api/tasks/${encodeURIComponent(taskId)}/resume`,
+    { method: "POST" },
+  );
   return parseResponse<TaskDetail>(response);
 };
 
-export const skipPlatform = async (taskId: string, platform: PlatformCode): Promise<void> => {
+export const skipPlatform = async (
+  taskId: string,
+  platform: PlatformCode,
+): Promise<void> => {
   const response = await fetch(
     `/api/tasks/${encodeURIComponent(taskId)}/platforms/${encodeURIComponent(platform)}/skip`,
-    { method: 'POST' },
+    { method: "POST" },
   );
   await parseResponse<unknown>(response);
 };
@@ -56,13 +77,13 @@ export const skipPlatform = async (taskId: string, platform: PlatformCode): Prom
 export const resumeManualVerification = async (
   taskId: string,
   platform: PlatformCode,
-  resumeContext: ManualVerificationContext = { source: 'frontend-task-page' },
+  resumeContext: ManualVerificationContext = { source: "frontend-task-page" },
 ): Promise<TaskDetail> => {
   const response = await fetch(
     `/api/tasks/${encodeURIComponent(taskId)}/platforms/${encodeURIComponent(platform)}/manual-verification/resume`,
     {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ resumeContext }),
     },
   );
@@ -70,6 +91,11 @@ export const resumeManualVerification = async (
 };
 
 export const getTaskResults = async (taskId: string): Promise<TaskResults> => {
-  const response = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/results`);
+  const response = await fetch(
+    `/api/tasks/${encodeURIComponent(taskId)}/results`,
+  );
   return parseResponse<TaskResults>(response);
 };
+
+export const createTaskEventSource = (taskId: string): EventSource =>
+  new EventSource(`/api/tasks/${encodeURIComponent(taskId)}/events`);
