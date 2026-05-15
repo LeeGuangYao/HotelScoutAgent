@@ -2,111 +2,114 @@
 
 ## 当前阶段
 
-第 8 阶段：前后端联调
+第 9 阶段：结果汇总与证据展示 MVP
 
 ## 上一阶段完成情况
 
-第 7 阶段：人工验证流程 MVP 已完成。
+第 8 阶段：前后端联调已完成。
 
 ### 已完成产物
 
-- backend/src/modules/task/task.types.ts
-- backend/src/modules/task/task.repository.ts
-- backend/src/modules/task/task.service.ts
-- backend/src/modules/task/task.controller.ts
-- backend/src/modules/state-machine/task-state-machine.ts
-- backend/src/modules/browser/browser-agent.ts
+- frontend/src/types/task.ts
+- frontend/src/api/tasks.ts
+- frontend/src/pages/HomePage.vue
+- frontend/src/pages/TaskPage.vue
+- frontend/vite.config.ts
 - plans/current-stage.md
 
-### 第 7 阶段自测结果
+### 第 8 阶段自测结果
 
-通过（存在环境限制）。
+通过（存在截图环境限制）。
 
 自测内容：
 
-1. 使用 Node 解析 backend/package.json，确认 JSON 格式有效。
-2. 使用 TypeScript 6.0.3 与临时类型桩执行后端源码静态类型检查，验证本阶段 TypeScript 代码结构与类型关系可通过检查。
-3. 尝试在 backend 目录执行 npm install --package-lock-only --ignore-scripts；受当前 npm registry/proxy 策略影响，访问 @fastify/cors 返回 403 Forbidden，未生成 package-lock。该项判定为环境限制。
-4. 尝试通过 npx 下载 TypeScript 5.7.2 执行静态类型检查；受当前 npm registry/proxy 策略影响，访问 typescript 返回 403 Forbidden。该项判定为环境限制。
-5. 尝试在 backend 目录执行 npm run typecheck；由于依赖未安装，TypeScript 无法找到 @types/node，未完成编译检查。该项由依赖安装环境限制导致。
+1. 在 frontend 目录执行 npm run typecheck，确认 Vue/TypeScript 类型检查通过。
+2. 在 backend 目录执行 npm run typecheck，确认后端 TypeScript 类型检查通过。
+3. 在 frontend 目录执行 npm run build，确认前端生产构建通过。
+4. 启动 backend dev server 后使用 curl 验证 POST /api/tasks、GET /api/tasks/:taskId、POST /api/tasks/:taskId/resume、POST /api/tasks/:taskId/pause、POST /api/tasks/:taskId/platforms/:platform/skip 调用路径可用。
+5. 使用 curl 验证 POST /api/tasks/:taskId/platforms/:platform/manual-verification 与 POST /api/tasks/:taskId/platforms/:platform/manual-verification/resume 调用路径可用。
+6. 尝试使用 Playwright 对前端页面截图；当前环境缺少 Playwright 浏览器可执行文件，截图未生成，该项判定为环境限制。
 
 ### 修改文件列表
 
-- 更新 backend/src/modules/task/task.types.ts
-- 更新 backend/src/modules/task/task.repository.ts
-- 更新 backend/src/modules/task/task.service.ts
-- 更新 backend/src/modules/task/task.controller.ts
-- 更新 backend/src/modules/state-machine/task-state-machine.ts
-- 更新 backend/src/modules/browser/browser-agent.ts
+- 新增 frontend/src/types/task.ts
+- 新增 frontend/src/api/tasks.ts
+- 更新 frontend/src/pages/HomePage.vue
+- 更新 frontend/src/pages/TaskPage.vue
+- 更新 frontend/vite.config.ts
 - 更新 plans/current-stage.md
 
 ### 本阶段完成内容
 
-- 扩展任务状态机，允许任务从 created 或 running 进入 waiting_manual_verification，并允许人工验证完成后恢复到 running。
-- 扩展平台子任务记录，增加 manualVerificationId，用于关联当前人工验证记录。
-- 新增内存版人工验证记录存储，记录任务、平台、原因、状态、截图路径、恢复上下文、请求时间、恢复时间、验证前任务状态和验证前平台状态。
-- 扩展 TaskDetail，返回当前任务关联的人工验证记录，便于查询验证原因与平台信息。
-- 实现 TaskService.requestManualVerification，可将主任务与平台子任务切换到 waiting_manual_verification，并在存在同任务同平台浏览器会话时衔接 BrowserAgent.requestManualVerification。
-- 实现 TaskService.resumeManualVerification，可恢复 BrowserAgent 等待状态，将人工验证记录标记为 resumed，并将主任务恢复到 running、平台子任务恢复到验证前状态。
-- 新增 HTTP MVP：POST /api/tasks/:taskId/platforms/:platform/manual-verification 用于登记人工验证暂停；POST /api/tasks/:taskId/platforms/:platform/manual-verification/resume 用于人工处理后恢复。
-- 不破解验证码、不绕过滑块验证、不伪造登录态、不实现真实平台采集、不实现多平台 Adapter 业务逻辑、不自动下单、不实现前端联调。
+- 新增前端任务领域类型，和后端 TaskDetail、PlatformTask、ManualVerificationRecord、SearchCriteria 等 MVP 数据结构对齐。
+- 新增前端任务 API 客户端，封装创建任务、查询任务详情、暂停、恢复、平台跳过、人工验证恢复等接口调用。
+- 将首页占位改造为可提交的酒店查询表单，支持目的地、入住/离店日期、人数、关键词、价格范围、距离筛选、平台选择和排序方式。
+- 首页提交成功后调用 POST /api/tasks 创建任务，并自动跳转到 /tasks/:taskId。
+- 将任务执行页占位改造为任务详情页，可通过 GET /api/tasks/:taskId 展示任务状态、查询条件、平台子任务状态、当前步骤、问题信息和人工验证信息。
+- 任务执行页新增刷新、开始/恢复、暂停、平台跳过和人工验证完成后继续按钮，打通第 8 阶段要求的前后端调用路径。
+- 为 Vite dev server 增加 /api 与 /health 代理到本地后端 http://localhost:3100，便于本地联调。
+- 保持单用户、本地运行、单平台优先 MVP 约束；不实现真实平台采集、不实现浏览器直播、不实现多用户、不实现自动验证码、不自动下单。
 
 ### 自测步骤
 
-1. node -e "JSON.parse(require('fs').readFileSync('backend/package.json','utf8')); console.log('backend/package.json ok')"
-2. npm install --package-lock-only --ignore-scripts（backend 目录）
-3. npx -y -p typescript@5.7.2 tsc -p /tmp/hotel-scout-tsconfig.json
-4. tsc -p /tmp/hotel-scout-tsconfig.json（使用 /tmp/hotel-scout-typecheck-stubs.d.ts 临时类型桩）
-5. npm run typecheck（backend 目录）
+1. npm run typecheck（frontend 目录）
+2. npm run typecheck（backend 目录）
+3. npm run build（frontend 目录）
+4. npm run dev（backend 目录）
+5. curl smoke：创建任务、查询任务、恢复任务、暂停任务、跳过平台
+6. curl smoke：登记人工验证、恢复人工验证
+7. npm run dev -- --host 127.0.0.1（frontend 目录）
+8. node -e "const { chromium } = require('playwright'); ..."（backend 目录，尝试截图）
 
 ### 自测结果
 
-- backend/package.json JSON 解析通过。
-- npm install 受 registry/proxy 策略影响失败，返回 403 Forbidden，未生成 package-lock，判定为环境限制。
-- npx 下载 TypeScript 5.7.2 受 registry/proxy 策略影响失败，返回 403 Forbidden，判定为环境限制。
-- 使用系统已安装 TypeScript 6.0.3 与临时类型桩执行静态类型检查通过。
-- npm run typecheck 因 node_modules 未安装失败，缺少 @types/node，判定为环境限制。
+- frontend npm run typecheck 通过。
+- backend npm run typecheck 通过。
+- frontend npm run build 通过。
+- curl smoke 验证任务创建、详情查询、恢复、暂停、平台跳过接口均可用。
+- curl smoke 验证人工验证登记和人工验证恢复接口均可用。
+- 前端 dev server 可启动，Vite 本地地址为 http://127.0.0.1:5173/。
+- Playwright 截图失败，原因是当前环境缺少 chromium_headless_shell 浏览器可执行文件，提示需要运行 npx playwright install；该项判定为环境限制。
 
 ### 已知问题
 
-- 当前环境访问 npm registry 时返回 403 Forbidden，依赖未能安装，因此未生成 package-lock，也无法完成项目原生 npm run typecheck。
+- 当前前端结果页仍为占位，结果汇总与证据展示留待第 9 阶段实现。
 - 当前任务、平台子任务、人工验证记录仍为内存 MVP，进程重启后数据会丢失，后续可替换为 SQLite。
-- 人工验证恢复后仅将任务恢复到 running、平台子任务恢复到验证前状态，真实平台采集循环仍需后续阶段接入。
-- 结果查询与事件流仍返回 501，留待后续结果汇总与事件推送阶段实现。
+- 当前前端“查看浏览器”仅展示后续阶段占位，不实现浏览器直播。
+- 当前阶段不实现真实平台采集，因此平台子任务状态需要通过后端已有 MVP 接口或后续采集流程推进。
 
 ### 风险点
 
-- 人工验证记录为内存存储，仅适合本地单用户 MVP。
-- 如果后续真实采集循环同时触发多次同平台人工验证，需要补充更严格的活动验证去重策略。
-- 当前 BrowserAgent 衔接仅在已存在同任务同平台浏览器会话时执行；无浏览器会话时只记录任务侧人工验证信息。
+- 前端类型与后端类型目前为手工同步，后续如果 API 结构变化，需要同步更新 frontend/src/types/task.ts。
+- 人工验证恢复按钮依赖后端返回 waiting 状态的人工验证记录；真实采集接入后需要继续验证多平台并发状态展示。
+- Vite 代理默认指向 http://localhost:3100，若后端端口变更需要同步调整或引入环境变量。
 
 ## 阶段目标
 
-开展前后端联调，使已有首页查询页、任务执行页与后端任务创建、查询、暂停、恢复和人工验证接口完成 MVP 级打通。
+实现任务结果汇总与证据展示 MVP，让任务结果页能够展示各平台采集结果、详情确认价、最低价标记、可信度和截图/URL/采集时间等证据信息。
 
 ## 当前阶段要求
 
-- 前端可以调用后端 POST /api/tasks 创建任务
-- 前端可以进入任务页并查询 GET /api/tasks/:taskId
-- 前端可以展示任务状态、平台子任务状态和人工验证信息
-- 前端可以调用暂停、恢复、平台跳过接口
-- 前端可以在人工验证状态下调用恢复接口
+- 前端可以进入结果页并查询任务结果
+- 后端提供任务结果查询 MVP 接口
+- 结果列表展示酒店名称、位置、平台来源、列表页价格、详情页确认价格、是否最低价、可信度、截图证据、采集时间
+- 结果汇总应能标记当前最低详情价
+- 证据展示保持本地文件/路径 MVP，不实现云存储
 - 保持单用户、本地运行、单平台优先的 MVP 约束
 - 不实现真实平台采集
-- 不实现浏览器直播
-- 不实现多用户
-- 不实现自动验证码
-- 不自动下单
+- 不实现自动下单
+- 不实现价格实时有效承诺
+- 不采集用户隐私数据
 
 ## 完成标准
 
-- 首页提交查询后能创建任务并跳转任务页
-- 任务页能展示后端返回的任务详情
-- 暂停、恢复、跳过、人工验证恢复的接口调用路径可用
+- GET /api/tasks/:taskId/results 返回任务结果 MVP 数据
+- 结果页能根据 taskId 展示后端返回的结果列表
+- 结果页能展示最低价、可信度和证据信息
 - 自测通过
 
 ## 阶段完成后
 
 如果自测通过，自动将当前阶段更新为：
 
-第 9 阶段：结果汇总与证据展示 MVP
+第 10 阶段：事件流与任务进度推送 MVP
