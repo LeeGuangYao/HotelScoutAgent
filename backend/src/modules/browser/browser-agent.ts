@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { getScreenshotsRoot } from '../../shared/paths.js';
 import type { PlatformCode } from '../task/task.types.js';
 import { BrowserManager } from './browser-manager.js';
 import type {
@@ -11,7 +12,7 @@ import type {
 
 const DEFAULT_BROWSER_OPTIONS: BrowserAgentOptions = {
   profilesRoot: path.resolve('browser-profiles'),
-  screenshotsRoot: path.resolve('screenshots'),
+  screenshotsRoot: getScreenshotsRoot(),
   maxSessions: 4,
   defaultHeadless: false,
 };

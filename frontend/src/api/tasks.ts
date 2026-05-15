@@ -99,3 +99,6 @@ export const getTaskResults = async (taskId: string): Promise<TaskResults> => {
 
 export const createTaskEventSource = (taskId: string): EventSource =>
   new EventSource(`/api/tasks/${encodeURIComponent(taskId)}/events`);
+
+export const getScreenshotPreviewUrl = (screenshotPath: string): string =>
+  `/api/evidence/screenshots/preview?path=${encodeURIComponent(screenshotPath)}`;

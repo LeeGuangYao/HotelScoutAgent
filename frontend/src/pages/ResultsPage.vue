@@ -2,7 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
 
-import { getTaskResults } from '@/api/tasks';
+import { getScreenshotPreviewUrl, getTaskResults } from '@/api/tasks';
 import type { HotelResult, PlatformCode, TaskResults, TaskStatus, TrustLevel } from '@/types/task';
 
 const route = useRoute();
@@ -45,6 +45,7 @@ const onlyLowest = ref(false);
 const onlyWithScreenshot = ref(false);
 const keyword = ref('');
 const selectedEvidence = ref<HotelResult | null>(null);
+const evidenceImageError = ref(false);
 
 const taskId = computed(() => {
   const value = route.params.taskId;
@@ -52,6 +53,11 @@ const taskId = computed(() => {
 });
 
 const availablePlatforms = computed(() => resultsData.value?.task.criteria.platforms ?? []);
+const selectedEvidencePreviewUrl = computed(() =>
+  selectedEvidence.value?.screenshotPath
+    ? getScreenshotPreviewUrl(selectedEvidence.value.screenshotPath)
+    : '',
+);
 
 const filteredResults = computed(() => {
   const query = keyword.value.trim().toLowerCase();
@@ -105,6 +111,16 @@ const clearFilters = (): void => {
   onlyLowest.value = false;
   onlyWithScreenshot.value = false;
   keyword.value = '';
+};
+
+const openEvidence = (result: HotelResult): void => {
+  selectedEvidence.value = result;
+  evidenceImageError.value = false;
+};
+
+const closeEvidence = (): void => {
+  selectedEvidence.value = null;
+  evidenceImageError.value = false;
 };
 
 const formatDateTime = (value: string): string => new Intl.DateTimeFormat('zh-CN', {
@@ -297,7 +313,7 @@ onMounted(() => {
                 v-if="result.screenshotPath"
                 class="mt-4 rounded-full bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
                 type="button"
-                @click="selectedEvidence = result"
+                @click="openEvidence(result)"
               >
                 查看截图证据
               </button>
@@ -314,12 +330,22 @@ onMounted(() => {
             <h2 class="text-2xl font-semibold text-white">截图证据</h2>
             <p class="mt-2 text-sm text-slate-400">{{ selectedEvidence.hotelName }} · {{ platformLabels[selectedEvidence.platform] }}</p>
           </div>
-          <button class="rounded-full border border-slate-700 px-3 py-1 text-sm text-slate-200" type="button" @click="selectedEvidence = null">关闭</button>
+          <button class="rounded-full border border-slate-700 px-3 py-1 text-sm text-slate-200" type="button" @click="closeEvidence">关闭</button>
         </div>
-        <div class="mt-6 rounded-2xl border border-dashed border-slate-700 bg-slate-950/70 p-8 text-center text-slate-300">
-          本地截图路径：{{ selectedEvidence.screenshotPath }}
-          <p class="mt-3 text-sm text-slate-500">第 9 阶段仅展示本地文件/路径 MVP，不实现云存储或静态文件服务。</p>
+        <div class="mt-6 overflow-hidden rounded-2xl border border-slate-700 bg-slate-950/70">
+          <img
+            v-if="selectedEvidencePreviewUrl && !evidenceImageError"
+            class="max-h-[70vh] w-full object-contain"
+            :src="selectedEvidencePreviewUrl"
+            :alt="`${selectedEvidence.hotelName} 截图证据`"
+            @error="evidenceImageError = true"
+          >
+          <div v-else class="p-8 text-center text-slate-300">
+            暂时无法预览该截图。
+            <p class="mt-3 text-sm text-slate-500">请确认截图文件存在于项目 screenshots 目录内，且格式为 png、jpg、jpeg 或 webp。</p>
+          </div>
         </div>
+        <p class="mt-3 break-all text-xs text-slate-500">本地截图路径：{{ selectedEvidence.screenshotPath }}</p>
         <div class="mt-5 grid gap-2 text-sm text-slate-300">
           <p>采集时间：{{ formatDateTime(selectedEvidence.collectedAt) }}</p>
           <p>来源 URL：<a v-if="selectedEvidence.sourceUrl" class="text-cyan-200" :href="selectedEvidence.sourceUrl" target="_blank" rel="noreferrer">{{ selectedEvidence.sourceUrl }}</a></p>

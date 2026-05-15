@@ -4,6 +4,7 @@ import { RouterLink, useRoute } from "vue-router";
 
 import {
   createTaskEventSource,
+  getScreenshotPreviewUrl,
   getTaskDetail,
   pauseTask,
   resumeManualVerification,
@@ -63,6 +64,7 @@ const realtimeStatus = ref<
 const realtimeMessage = ref("实时事件流尚未连接。");
 const latestEventAt = ref("");
 const eventResultsSummary = ref<TaskEventResultsSummary | null>(null);
+const manualEvidenceImageErrors = ref<Record<string, boolean>>({});
 let taskEventSource: EventSource | null = null;
 
 const taskId = computed(() => {
@@ -76,6 +78,16 @@ const activeManualVerifications = computed(
       (record) => record.status === "waiting",
     ) ?? [],
 );
+
+const manualEvidencePreviewUrl = (screenshotPath: string): string =>
+  getScreenshotPreviewUrl(screenshotPath);
+
+const markManualEvidenceImageError = (recordId: string): void => {
+  manualEvidenceImageErrors.value = {
+    ...manualEvidenceImageErrors.value,
+    [recordId]: true,
+  };
+};
 
 const loadTask = async (): Promise<void> => {
   if (!taskId.value) {
@@ -482,9 +494,24 @@ onUnmounted(() => {
             <p class="mt-2 text-sm text-amber-100">
               请求时间：{{ formatDateTime(record.requestedAt) }}
             </p>
-            <p v-if="record.screenshotPath" class="mt-2 text-sm text-slate-300">
-              截图证据：{{ record.screenshotPath }}
-            </p>
+            <div
+              v-if="record.screenshotPath"
+              class="mt-3 overflow-hidden rounded-2xl border border-amber-300/20 bg-slate-950/70"
+            >
+              <img
+                v-if="!manualEvidenceImageErrors[record.id]"
+                class="max-h-64 w-full object-contain"
+                :src="manualEvidencePreviewUrl(record.screenshotPath)"
+                :alt="`${platformLabels[record.platform]} 人工验证截图证据`"
+                @error="markManualEvidenceImageError(record.id)"
+              >
+              <div v-else class="p-4 text-sm text-amber-100">
+                暂时无法预览该截图，请确认文件仍在项目 screenshots 目录内。
+              </div>
+              <p class="break-all px-4 py-3 text-xs text-slate-400">
+                截图证据：{{ record.screenshotPath }}
+              </p>
+            </div>
             <button
               class="mt-4 rounded-full bg-amber-300 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-300"
               :disabled="actionKey === `manual-${record.platform}`"
