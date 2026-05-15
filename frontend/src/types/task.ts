@@ -56,6 +56,20 @@ export type ManualVerificationRecord = {
   resumedAt?: string;
 };
 
+export type RequestManualVerificationInput = {
+  taskId: string;
+  platform: PlatformCode;
+  reason: string;
+  screenshotPath?: string;
+  resumeContext?: ManualVerificationContext;
+};
+
+export type ResumeManualVerificationInput = {
+  taskId: string;
+  platform: PlatformCode;
+  resumeContext?: ManualVerificationContext;
+};
+
 export type Task = {
   id: string;
   name: string;
@@ -76,6 +90,45 @@ export type PlatformTask = {
   issue?: string;
   manualVerificationId?: string;
   updatedAt: string;
+};
+
+export type Money = {
+  amount: number;
+  currency: 'CNY' | 'JPY' | 'USD' | 'EUR';
+  display: string;
+};
+
+export type TrustLevel = 'high' | 'medium' | 'low';
+
+export type HotelResult = {
+  id: string;
+  taskId: string;
+  hotelName: string;
+  location: string;
+  platform: PlatformCode;
+  listPrice?: Money;
+  detailPrice?: Money;
+  isLowestDetailPrice: boolean;
+  trustLevel: TrustLevel;
+  trustReasons: string[];
+  screenshotPath?: string;
+  sourceUrl?: string;
+  collectedAt: string;
+};
+
+export type TaskResultsSummary = {
+  totalResults: number;
+  detailPriceCount: number;
+  lowestDetailPrice?: Money;
+  platformCount: number;
+  evidenceCompleteCount: number;
+  generatedAt: string;
+};
+
+export type TaskResults = {
+  task: Task;
+  summary: TaskResultsSummary;
+  results: HotelResult[];
 };
 
 export type TaskDetail = {

@@ -4,7 +4,9 @@ import { TaskScheduler } from '../scheduler/task-scheduler.js';
 import { TaskStateMachine } from '../state-machine/task-state-machine.js';
 import { TaskRepository } from './task.repository.js';
 import type {
+  HotelResult,
   ManualVerificationRecord,
+  Money,
   PlatformCode,
   PlatformTask,
   PlatformTaskStatus,
@@ -13,11 +15,26 @@ import type {
   SearchCriteria,
   Task,
   TaskDetail,
+  TaskResults,
   TaskStatus,
 } from './task.types.js';
 
 const DEFAULT_SORT_BY: SearchCriteria['sortBy'] = 'price';
 const DEFAULT_PLATFORMS: readonly PlatformCode[] = ['ctrip'];
+
+const PLATFORM_PRICE_OFFSETS: Record<PlatformCode, number> = {
+  ctrip: 0,
+  booking: 28,
+  fliggy: 16,
+  meituan: 42,
+};
+
+const PLATFORM_SOURCE_HOSTS: Record<PlatformCode, string> = {
+  ctrip: 'https://hotels.ctrip.com',
+  booking: 'https://www.booking.com',
+  fliggy: 'https://www.fliggy.com',
+  meituan: 'https://hotel.meituan.com',
+};
 
 export class TaskService {
   private readonly repository: TaskRepository;
@@ -57,6 +74,8 @@ export class TaskService {
 
     await this.repository.save(task);
 
+    const seededResults = this.createMvpResults(task, now);
+
     await Promise.all(
       normalizedCriteria.platforms.map((platform) =>
         this.repository.savePlatformTask({
@@ -64,12 +83,13 @@ export class TaskService {
           taskId: task.id,
           platform,
           status: 'pending',
-          currentStep: '等待调度',
-          collectedCount: 0,
+          currentStep: '等待调度，已准备结果展示 MVP 示例数据',
+          collectedCount: seededResults.filter((result) => result.platform === platform).length,
           updatedAt: now,
         }),
       ),
     );
+    await this.repository.saveHotelResults(seededResults);
 
     return task;
   }
@@ -88,6 +108,30 @@ export class TaskService {
       task,
       platforms: await this.repository.findPlatformTasksByTaskId(taskId),
       manualVerifications: await this.repository.findManualVerificationsByTaskId(taskId),
+    };
+  }
+
+
+  async getTaskResults(taskId: string): Promise<TaskResults | null> {
+    const task = await this.repository.findById(taskId);
+    if (!task) {
+      return null;
+    }
+
+    const results = this.markLowestDetailPrices(await this.repository.findHotelResultsByTaskId(taskId));
+    const lowestDetailPrice = results.find((result) => result.isLowestDetailPrice)?.detailPrice;
+
+    return {
+      task,
+      summary: {
+        totalResults: results.length,
+        detailPriceCount: results.filter((result) => result.detailPrice).length,
+        lowestDetailPrice,
+        platformCount: new Set(results.map((result) => result.platform)).size,
+        evidenceCompleteCount: results.filter((result) => result.screenshotPath && result.sourceUrl).length,
+        generatedAt: new Date().toISOString(),
+      },
+      results,
     };
   }
 
@@ -237,6 +281,80 @@ export class TaskService {
       reason: input.reason,
       screenshotPath: input.screenshotPath,
     });
+  }
+
+
+  private createMvpResults(task: Task, collectedAt: string): HotelResult[] {
+    const destination = task.criteria.destination;
+    const keyword = task.criteria.keywords?.[0] ?? '市中心';
+    const baseMaxPrice = task.criteria.priceMax && task.criteria.priceMax > 0 ? task.criteria.priceMax : 520;
+    const firstBasePrice = Math.max(task.criteria.priceMin ?? 0, Math.min(baseMaxPrice - 34, 486));
+
+    return task.criteria.platforms.flatMap((platform, platformIndex) => {
+      const offset = PLATFORM_PRICE_OFFSETS[platform];
+      const primaryDetailAmount = firstBasePrice + offset;
+      const primaryListAmount = primaryDetailAmount - (platformIndex % 2 === 0 ? 0 : 18);
+      const fallbackListAmount = firstBasePrice + offset + 96;
+
+      return [
+        {
+          id: `${task.id}:${platform}:primary`,
+          taskId: task.id,
+          hotelName: `${destination}${keyword}精选酒店`,
+          location: `${destination} · ${keyword}`,
+          platform,
+          listPrice: this.money(primaryListAmount),
+          detailPrice: this.money(primaryDetailAmount),
+          isLowestDetailPrice: false,
+          trustLevel: 'high',
+          trustReasons: [
+            '已保存详情页截图',
+            '包含来源 URL 与采集时间',
+            primaryListAmount === primaryDetailAmount ? '列表价与详情确认价一致' : '列表价与详情确认价不一致',
+          ],
+          screenshotPath: `screenshots/${task.id}/${platform}-primary.png`,
+          sourceUrl: `${PLATFORM_SOURCE_HOSTS[platform]}/hotel/${encodeURIComponent(destination)}-${platform}-primary`,
+          collectedAt,
+        },
+        {
+          id: `${task.id}:${platform}:secondary`,
+          taskId: task.id,
+          hotelName: `${destination}近地铁舒适酒店`,
+          location: `${destination} · 近地铁`,
+          platform,
+          listPrice: this.money(fallbackListAmount),
+          detailPrice: platformIndex === 0 ? undefined : this.money(fallbackListAmount + 22),
+          isLowestDetailPrice: false,
+          trustLevel: platformIndex === 0 ? 'low' : 'medium',
+          trustReasons:
+            platformIndex === 0
+              ? ['缺少详情页确认价', '截图证据缺失，仅保留列表页价格']
+              : ['有详情页确认价和来源 URL', '截图证据缺失，可信度降低'],
+          sourceUrl: `${PLATFORM_SOURCE_HOSTS[platform]}/hotel/${encodeURIComponent(destination)}-${platform}-secondary`,
+          collectedAt,
+        },
+      ];
+    });
+  }
+
+  private markLowestDetailPrices(results: HotelResult[]): HotelResult[] {
+    const detailPrices = results
+      .map((result) => result.detailPrice?.amount)
+      .filter((amount): amount is number => typeof amount === 'number');
+    const lowestAmount = detailPrices.length > 0 ? Math.min(...detailPrices) : null;
+
+    return results.map((result) => ({
+      ...result,
+      isLowestDetailPrice: lowestAmount !== null && result.detailPrice?.amount === lowestAmount,
+    }));
+  }
+
+  private money(amount: number): Money {
+    return {
+      amount,
+      currency: 'CNY',
+      display: `¥${amount}`,
+    };
   }
 
   private normalizeCriteria(criteria: SearchCriteria): SearchCriteria {
