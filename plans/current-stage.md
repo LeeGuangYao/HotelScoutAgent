@@ -2,23 +2,23 @@
 
 ## 当前阶段
 
-第 7 阶段：人工验证流程 MVP
+第 8 阶段：前后端联调
 
 ## 上一阶段完成情况
 
-第 6 阶段：任务系统与状态机 MVP 已完成。
+第 7 阶段：人工验证流程 MVP 已完成。
 
 ### 已完成产物
 
-- backend/src/modules/state-machine/task-state-machine.ts
-- backend/src/modules/scheduler/task-scheduler.ts
+- backend/src/modules/task/task.types.ts
 - backend/src/modules/task/task.repository.ts
 - backend/src/modules/task/task.service.ts
 - backend/src/modules/task/task.controller.ts
-- backend/src/modules/task/task.types.ts
-- backend/src/shared/http.ts
+- backend/src/modules/state-machine/task-state-machine.ts
+- backend/src/modules/browser/browser-agent.ts
+- plans/current-stage.md
 
-### 第 6 阶段自测结果
+### 第 7 阶段自测结果
 
 通过（存在环境限制）。
 
@@ -27,84 +27,86 @@
 1. 使用 Node 解析 backend/package.json，确认 JSON 格式有效。
 2. 使用 TypeScript 6.0.3 与临时类型桩执行后端源码静态类型检查，验证本阶段 TypeScript 代码结构与类型关系可通过检查。
 3. 尝试在 backend 目录执行 npm install --package-lock-only --ignore-scripts；受当前 npm registry/proxy 策略影响，访问 @fastify/cors 返回 403 Forbidden，未生成 package-lock。该项判定为环境限制。
-4. 尝试在 backend 目录执行 npm run typecheck；由于依赖未安装，TypeScript 无法找到 @types/node，未完成编译检查。该项由依赖安装环境限制导致。
+4. 尝试通过 npx 下载 TypeScript 5.7.2 执行静态类型检查；受当前 npm registry/proxy 策略影响，访问 typescript 返回 403 Forbidden。该项判定为环境限制。
+5. 尝试在 backend 目录执行 npm run typecheck；由于依赖未安装，TypeScript 无法找到 @types/node，未完成编译检查。该项由依赖安装环境限制导致。
 
 ### 修改文件列表
 
-- 更新 backend/src/modules/state-machine/task-state-machine.ts
-- 更新 backend/src/modules/scheduler/task-scheduler.ts
+- 更新 backend/src/modules/task/task.types.ts
 - 更新 backend/src/modules/task/task.repository.ts
 - 更新 backend/src/modules/task/task.service.ts
 - 更新 backend/src/modules/task/task.controller.ts
-- 更新 backend/src/modules/task/task.types.ts
-- 更新 backend/src/shared/http.ts
+- 更新 backend/src/modules/state-machine/task-state-machine.ts
+- 更新 backend/src/modules/browser/browser-agent.ts
 - 更新 plans/current-stage.md
 
 ### 本阶段完成内容
 
-- 实现主任务状态机与平台子任务状态机，提供合法流转判断、断言方法与终态判断。
-- 实现内存版 TaskRepository，可保存与查询主任务、平台子任务。
-- 实现 TaskService 的任务创建、任务详情查询、主任务状态流转、平台子任务状态流转与调度器调用入口。
-- 实现 TaskScheduler MVP，支持 enqueue / stop，并通过 hook 将任务状态推进到 running / paused。
-- 实现任务 HTTP MVP：POST /api/tasks 可创建任务，GET /api/tasks/:taskId 可查询任务详情，pause / resume / platform skip 可调用状态流转。
-- 保留 Browser Agent 作为 TaskService 依赖，继续作为后续真实调度执行入口。
-- 未实现真实平台采集、未实现多平台 Adapter 业务逻辑、未破解或绕过验证码、未实现自动下单、未实现前端联调。
+- 扩展任务状态机，允许任务从 created 或 running 进入 waiting_manual_verification，并允许人工验证完成后恢复到 running。
+- 扩展平台子任务记录，增加 manualVerificationId，用于关联当前人工验证记录。
+- 新增内存版人工验证记录存储，记录任务、平台、原因、状态、截图路径、恢复上下文、请求时间、恢复时间、验证前任务状态和验证前平台状态。
+- 扩展 TaskDetail，返回当前任务关联的人工验证记录，便于查询验证原因与平台信息。
+- 实现 TaskService.requestManualVerification，可将主任务与平台子任务切换到 waiting_manual_verification，并在存在同任务同平台浏览器会话时衔接 BrowserAgent.requestManualVerification。
+- 实现 TaskService.resumeManualVerification，可恢复 BrowserAgent 等待状态，将人工验证记录标记为 resumed，并将主任务恢复到 running、平台子任务恢复到验证前状态。
+- 新增 HTTP MVP：POST /api/tasks/:taskId/platforms/:platform/manual-verification 用于登记人工验证暂停；POST /api/tasks/:taskId/platforms/:platform/manual-verification/resume 用于人工处理后恢复。
+- 不破解验证码、不绕过滑块验证、不伪造登录态、不实现真实平台采集、不实现多平台 Adapter 业务逻辑、不自动下单、不实现前端联调。
 
 ### 自测步骤
 
 1. node -e "JSON.parse(require('fs').readFileSync('backend/package.json','utf8')); console.log('backend/package.json ok')"
-2. tsc -p /tmp/hotel-scout-tsconfig.json（使用 /tmp/hotel-scout-typecheck-stubs.d.ts 临时类型桩）
-3. npm install --package-lock-only --ignore-scripts（backend 目录）
-4. npm run typecheck（backend 目录）
+2. npm install --package-lock-only --ignore-scripts（backend 目录）
+3. npx -y -p typescript@5.7.2 tsc -p /tmp/hotel-scout-tsconfig.json
+4. tsc -p /tmp/hotel-scout-tsconfig.json（使用 /tmp/hotel-scout-typecheck-stubs.d.ts 临时类型桩）
+5. npm run typecheck（backend 目录）
 
 ### 自测结果
 
 - backend/package.json JSON 解析通过。
-- 临时类型桩静态类型检查通过。
-- npm install 受 registry/proxy 策略影响失败，返回 403 Forbidden，判定为环境限制。
+- npm install 受 registry/proxy 策略影响失败，返回 403 Forbidden，未生成 package-lock，判定为环境限制。
+- npx 下载 TypeScript 5.7.2 受 registry/proxy 策略影响失败，返回 403 Forbidden，判定为环境限制。
+- 使用系统已安装 TypeScript 6.0.3 与临时类型桩执行静态类型检查通过。
 - npm run typecheck 因 node_modules 未安装失败，缺少 @types/node，判定为环境限制。
 
 ### 已知问题
 
 - 当前环境访问 npm registry 时返回 403 Forbidden，依赖未能安装，因此未生成 package-lock，也无法完成项目原生 npm run typecheck。
-- 当前任务存储为内存 MVP，进程重启后任务数据会丢失，后续可替换为 SQLite。
-- 当前调度器只提供 enqueue / stop 与状态推进入口，不执行真实平台采集。
+- 当前任务、平台子任务、人工验证记录仍为内存 MVP，进程重启后数据会丢失，后续可替换为 SQLite。
+- 人工验证恢复后仅将任务恢复到 running、平台子任务恢复到验证前状态，真实平台采集循环仍需后续阶段接入。
 - 结果查询与事件流仍返回 501，留待后续结果汇总与事件推送阶段实现。
 
 ### 风险点
 
-- 内存存储仅适合本地单用户 MVP，不适合并发、多用户或长期任务保存。
-- pause / resume 当前只处理任务状态，不会中断或恢复真实浏览器采集流程，需在后续阶段接入平台 Adapter 执行循环。
-- 人工验证流程需要结合 Browser Agent 的 request / wait / resume 能力继续完善，避免任务状态与浏览器状态不一致。
+- 人工验证记录为内存存储，仅适合本地单用户 MVP。
+- 如果后续真实采集循环同时触发多次同平台人工验证，需要补充更严格的活动验证去重策略。
+- 当前 BrowserAgent 衔接仅在已存在同任务同平台浏览器会话时执行；无浏览器会话时只记录任务侧人工验证信息。
 
 ## 阶段目标
 
-实现人工验证流程 MVP，使任务系统可以在检测到登录、验证码或滑块时进入等待人工处理状态，并在用户处理后恢复任务执行入口。
+开展前后端联调，使已有首页查询页、任务执行页与后端任务创建、查询、暂停、恢复和人工验证接口完成 MVP 级打通。
 
 ## 当前阶段要求
 
-- 可以将任务状态流转到 waiting_manual_verification
-- 可以将平台子任务状态流转到 waiting_manual_verification
-- 可以记录人工验证原因、平台、截图路径或恢复上下文的 MVP 信息
-- 可以通过接口或服务方法恢复人工验证流程
-- 可以与 Browser Agent 的 requestManualVerification / resumeManualVerification 能力衔接
-- 不破解验证码
-- 不绕过滑块验证
-- 不伪造登录态
+- 前端可以调用后端 POST /api/tasks 创建任务
+- 前端可以进入任务页并查询 GET /api/tasks/:taskId
+- 前端可以展示任务状态、平台子任务状态和人工验证信息
+- 前端可以调用暂停、恢复、平台跳过接口
+- 前端可以在人工验证状态下调用恢复接口
+- 保持单用户、本地运行、单平台优先的 MVP 约束
 - 不实现真实平台采集
-- 不实现多平台 Adapter 业务逻辑
+- 不实现浏览器直播
+- 不实现多用户
+- 不实现自动验证码
 - 不自动下单
-- 不实现前端联调
 
 ## 完成标准
 
-- 验证时任务能暂停到 waiting_manual_verification
-- 用户处理后能恢复到 running 或可调度状态
-- 人工验证原因与平台信息可查询
+- 首页提交查询后能创建任务并跳转任务页
+- 任务页能展示后端返回的任务详情
+- 暂停、恢复、跳过、人工验证恢复的接口调用路径可用
 - 自测通过
 
 ## 阶段完成后
 
 如果自测通过，自动将当前阶段更新为：
 
-第 8 阶段：前后端联调
+第 9 阶段：结果汇总与证据展示 MVP

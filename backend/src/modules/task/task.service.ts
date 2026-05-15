@@ -4,9 +4,12 @@ import { TaskScheduler } from '../scheduler/task-scheduler.js';
 import { TaskStateMachine } from '../state-machine/task-state-machine.js';
 import { TaskRepository } from './task.repository.js';
 import type {
+  ManualVerificationRecord,
   PlatformCode,
   PlatformTask,
   PlatformTaskStatus,
+  RequestManualVerificationInput,
+  ResumeManualVerificationInput,
   SearchCriteria,
   Task,
   TaskDetail,
@@ -84,6 +87,7 @@ export class TaskService {
     return {
       task,
       platforms: await this.repository.findPlatformTasksByTaskId(taskId),
+      manualVerifications: await this.repository.findManualVerificationsByTaskId(taskId),
     };
   }
 
@@ -118,7 +122,7 @@ export class TaskService {
     taskId: string,
     platform: PlatformCode,
     status: PlatformTaskStatus,
-    options: { currentStep?: string; issue?: string; collectedCount?: number } = {},
+    options: { currentStep?: string; issue?: string; collectedCount?: number; manualVerificationId?: string } = {},
   ): Promise<PlatformTask> {
     const platformTask = await this.repository.findPlatformTask(taskId, platform);
     if (!platformTask) {
@@ -133,6 +137,7 @@ export class TaskService {
       currentStep: options.currentStep ?? platformTask.currentStep,
       collectedCount: options.collectedCount ?? platformTask.collectedCount,
       issue: options.issue ?? platformTask.issue,
+      manualVerificationId: options.manualVerificationId ?? platformTask.manualVerificationId,
       updatedAt: new Date().toISOString(),
     };
 
@@ -148,16 +153,66 @@ export class TaskService {
     return this.browserAgent.closeSession(platform);
   }
 
-  requestManualVerification(
-    taskId: string,
-    platform: PlatformCode,
-    reason: string,
-  ): ReturnType<BrowserAgent['requestManualVerification']> {
-    return this.browserAgent.requestManualVerification({ taskId, platform, reason });
+  async requestManualVerification(input: RequestManualVerificationInput): Promise<TaskDetail> {
+    const task = await this.ensureTaskExists(input.taskId);
+    const platformTask = await this.ensurePlatformTask(input.taskId, input.platform);
+    const now = new Date().toISOString();
+    const browserRequest = await this.requestBrowserManualVerification(input);
+    const screenshotPath = input.screenshotPath ?? browserRequest?.screenshotPath;
+
+    const manualVerification: ManualVerificationRecord = {
+      id: randomUUID(),
+      taskId: input.taskId,
+      platform: input.platform,
+      reason: input.reason,
+      status: 'waiting',
+      previousTaskStatus: task.status,
+      previousPlatformStatus: platformTask.status,
+      resumeToTaskStatus: 'running',
+      resumeToPlatformStatus: platformTask.status === 'waiting_manual_verification' ? 'opening' : platformTask.status,
+      screenshotPath,
+      resumeContext: input.resumeContext,
+      requestedAt: browserRequest?.requestedAt ?? now,
+    };
+
+    await this.repository.saveManualVerification(manualVerification);
+    await this.transitionPlatformTask(input.taskId, input.platform, 'waiting_manual_verification', {
+      currentStep: '等待人工处理登录、验证码或滑块验证',
+      issue: input.reason,
+      manualVerificationId: manualVerification.id,
+    });
+    await this.transitionTask(input.taskId, 'waiting_manual_verification');
+
+    return this.requireTaskDetail(input.taskId);
   }
 
-  resumeManualVerification(platform: PlatformCode): BrowserSessionSnapshot {
-    return this.browserAgent.resumeManualVerification(platform);
+  async resumeManualVerification(input: ResumeManualVerificationInput): Promise<TaskDetail> {
+    const manualVerification = await this.repository.findActiveManualVerification(input.taskId, input.platform);
+    if (!manualVerification) {
+      throw new Error(`Manual verification not found: ${input.taskId}/${input.platform}`);
+    }
+
+    const browserSession = this.browserAgent.getSession(input.platform);
+    if (browserSession?.taskId === input.taskId && browserSession.status === 'waiting_manual_verification') {
+      this.browserAgent.resumeManualVerification(input.platform);
+    }
+
+    const resumed: ManualVerificationRecord = {
+      ...manualVerification,
+      status: 'resumed',
+      resumeContext: input.resumeContext ?? manualVerification.resumeContext,
+      resumedAt: new Date().toISOString(),
+    };
+    await this.repository.saveManualVerification(resumed);
+
+    await this.transitionPlatformTask(input.taskId, input.platform, manualVerification.resumeToPlatformStatus, {
+      currentStep: '人工验证已完成，等待继续调度',
+      issue: '',
+      manualVerificationId: manualVerification.id,
+    });
+    await this.transitionTask(input.taskId, manualVerification.resumeToTaskStatus);
+
+    return this.requireTaskDetail(input.taskId);
   }
 
   listBrowserSessions(): BrowserSessionSnapshot[] {
@@ -166,6 +221,22 @@ export class TaskService {
 
   getSchedulerSnapshot(): ReturnType<TaskScheduler['snapshot']> {
     return this.scheduler.snapshot();
+  }
+
+  private async requestBrowserManualVerification(
+    input: RequestManualVerificationInput,
+  ): Promise<Awaited<ReturnType<BrowserAgent['requestManualVerification']>> | null> {
+    const browserSession = this.browserAgent.getSession(input.platform);
+    if (!browserSession || browserSession.taskId !== input.taskId) {
+      return null;
+    }
+
+    return this.browserAgent.requestManualVerification({
+      taskId: input.taskId,
+      platform: input.platform,
+      reason: input.reason,
+      screenshotPath: input.screenshotPath,
+    });
   }
 
   private normalizeCriteria(criteria: SearchCriteria): SearchCriteria {
@@ -184,6 +255,14 @@ export class TaskService {
       throw new Error(`Task not found: ${taskId}`);
     }
     return task;
+  }
+
+  private async ensurePlatformTask(taskId: string, platform: PlatformCode): Promise<PlatformTask> {
+    const platformTask = await this.repository.findPlatformTask(taskId, platform);
+    if (!platformTask) {
+      throw new Error(`Platform task not found: ${taskId}/${platform}`);
+    }
+    return platformTask;
   }
 
   private async requireTaskDetail(taskId: string): Promise<TaskDetail> {

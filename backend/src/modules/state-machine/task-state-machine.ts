@@ -4,7 +4,7 @@ const TASK_TERMINAL_STATUSES = new Set<TaskStatus>(['completed', 'failed', 'canc
 const PLATFORM_TERMINAL_STATUSES = new Set<PlatformTaskStatus>(['completed', 'failed', 'skipped']);
 
 const TASK_TRANSITIONS: Record<TaskStatus, readonly TaskStatus[]> = {
-  created: ['running', 'cancelled', 'failed'],
+  created: ['running', 'waiting_manual_verification', 'cancelled', 'failed'],
   running: ['waiting_manual_verification', 'paused', 'completed', 'cancelled', 'failed'],
   waiting_manual_verification: ['running', 'cancelled', 'failed'],
   paused: ['running', 'cancelled', 'failed'],

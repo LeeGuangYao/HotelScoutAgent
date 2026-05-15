@@ -36,6 +36,40 @@ export type PlatformTaskStatus =
   | 'completed'
   | 'failed';
 
+export type ManualVerificationStatus = 'waiting' | 'resumed';
+
+export type ManualVerificationContext = Record<string, unknown>;
+
+export type ManualVerificationRecord = {
+  id: string;
+  taskId: string;
+  platform: PlatformCode;
+  reason: string;
+  status: ManualVerificationStatus;
+  previousTaskStatus: TaskStatus;
+  previousPlatformStatus: PlatformTaskStatus;
+  resumeToTaskStatus: TaskStatus;
+  resumeToPlatformStatus: PlatformTaskStatus;
+  screenshotPath?: string;
+  resumeContext?: ManualVerificationContext;
+  requestedAt: string;
+  resumedAt?: string;
+};
+
+export type RequestManualVerificationInput = {
+  taskId: string;
+  platform: PlatformCode;
+  reason: string;
+  screenshotPath?: string;
+  resumeContext?: ManualVerificationContext;
+};
+
+export type ResumeManualVerificationInput = {
+  taskId: string;
+  platform: PlatformCode;
+  resumeContext?: ManualVerificationContext;
+};
+
 export type Task = {
   id: string;
   name: string;
@@ -54,10 +88,12 @@ export type PlatformTask = {
   currentStep: string;
   collectedCount: number;
   issue?: string;
+  manualVerificationId?: string;
   updatedAt: string;
 };
 
 export type TaskDetail = {
   task: Task;
   platforms: PlatformTask[];
+  manualVerifications: ManualVerificationRecord[];
 };
