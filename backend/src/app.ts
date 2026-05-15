@@ -1,6 +1,7 @@
 import cors from '@fastify/cors';
 import Fastify from 'fastify';
 import type { BackendConfig } from './config/env.js';
+import { registerEvidenceRoutes } from './modules/evidence/evidence.controller.js';
 import { registerTaskRoutes } from './modules/task/task.controller.js';
 
 export const buildApp = async (config: BackendConfig) => {
@@ -10,6 +11,7 @@ export const buildApp = async (config: BackendConfig) => {
 
   app.get('/health', async () => ({ status: 'ok', service: 'hotel-scout-agent-backend' }));
 
+  await registerEvidenceRoutes(app);
   await registerTaskRoutes(app);
 
   return app;
