@@ -1,4 +1,4 @@
-import type { ManualVerificationContext, PlatformCode, SearchCriteria, TaskDetail } from '@/types/task';
+import type { ManualVerificationContext, PlatformCode, SearchCriteria, TaskDetail, TaskResults } from '@/types/task';
 
 type ApiEnvelope<TData> = {
   data: TData;
@@ -67,4 +67,9 @@ export const resumeManualVerification = async (
     },
   );
   return parseResponse<TaskDetail>(response);
+};
+
+export const getTaskResults = async (taskId: string): Promise<TaskResults> => {
+  const response = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/results`);
+  return parseResponse<TaskResults>(response);
 };

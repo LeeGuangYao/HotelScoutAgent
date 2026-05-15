@@ -1,4 +1,4 @@
-import type { ManualVerificationRecord, PlatformTask, Task } from './task.types.js';
+import type { HotelResult, ManualVerificationRecord, PlatformTask, Task } from './task.types.js';
 
 const cloneTask = (task: Task): Task => ({
   ...task,
@@ -16,10 +16,18 @@ const cloneManualVerification = (record: ManualVerificationRecord): ManualVerifi
   resumeContext: record.resumeContext ? { ...record.resumeContext } : undefined,
 });
 
+const cloneHotelResult = (result: HotelResult): HotelResult => ({
+  ...result,
+  listPrice: result.listPrice ? { ...result.listPrice } : undefined,
+  detailPrice: result.detailPrice ? { ...result.detailPrice } : undefined,
+  trustReasons: [...result.trustReasons],
+});
+
 export class TaskRepository {
   private readonly tasks = new Map<string, Task>();
   private readonly platformTasks = new Map<string, PlatformTask>();
   private readonly manualVerifications = new Map<string, ManualVerificationRecord>();
+  private readonly hotelResults = new Map<string, HotelResult>();
 
   async save(task: Task): Promise<void> {
     this.tasks.set(task.id, cloneTask(task));
@@ -69,5 +77,18 @@ export class TaskRepository {
       .sort((left, right) => right.requestedAt.localeCompare(left.requestedAt))[0];
 
     return activeRecord ? cloneManualVerification(activeRecord) : null;
+  }
+
+  async saveHotelResults(results: HotelResult[]): Promise<void> {
+    for (const result of results) {
+      this.hotelResults.set(result.id, cloneHotelResult(result));
+    }
+  }
+
+  async findHotelResultsByTaskId(taskId: string): Promise<HotelResult[]> {
+    return [...this.hotelResults.values()]
+      .filter((result) => result.taskId === taskId)
+      .map(cloneHotelResult)
+      .sort((left, right) => left.collectedAt.localeCompare(right.collectedAt) || left.id.localeCompare(right.id));
   }
 }

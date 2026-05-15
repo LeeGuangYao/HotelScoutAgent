@@ -133,8 +133,13 @@ export const registerTaskRoutes = async (app: FastifyInstance): Promise<void> =>
     },
   );
 
-  app.get('/api/tasks/:taskId/results', async (_request, reply) => {
-    return reply.code(501).send(notImplemented('Task results query'));
+  app.get<{ Params: TaskParams }>('/api/tasks/:taskId/results', async (request, reply) => {
+    const results = await taskService.getTaskResults(request.params.taskId);
+    if (!results) {
+      return reply.code(404).send(apiError('TASK_NOT_FOUND', `Task not found: ${request.params.taskId}`));
+    }
+
+    return reply.send(ok(results));
   });
 
   app.get('/api/tasks/:taskId/events', async (_request, reply) => {

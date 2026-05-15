@@ -22,5 +22,10 @@ export const router = createRouter({
       name: 'results',
       component: ResultsPage,
     },
+    {
+      path: '/tasks/:taskId/results',
+      name: 'task-results',
+      component: ResultsPage,
+    },
   ],
 });

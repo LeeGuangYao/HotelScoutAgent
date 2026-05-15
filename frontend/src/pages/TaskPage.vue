@@ -156,6 +156,12 @@ onMounted(() => {
             >
               {{ actionKey === 'pause-task' ? '暂停中…' : '暂停' }}
             </button>
+            <RouterLink
+              class="rounded-full bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
+              :to="{ name: 'task-results', params: { taskId } }"
+            >
+              查看结果
+            </RouterLink>
           </div>
         </div>
 
