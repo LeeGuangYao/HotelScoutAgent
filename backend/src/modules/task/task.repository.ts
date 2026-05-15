@@ -1,4 +1,4 @@
-import type { PlatformTask, Task } from './task.types.js';
+import type { ManualVerificationRecord, PlatformTask, Task } from './task.types.js';
 
 const cloneTask = (task: Task): Task => ({
   ...task,
@@ -11,9 +11,15 @@ const cloneTask = (task: Task): Task => ({
 
 const clonePlatformTask = (platformTask: PlatformTask): PlatformTask => ({ ...platformTask });
 
+const cloneManualVerification = (record: ManualVerificationRecord): ManualVerificationRecord => ({
+  ...record,
+  resumeContext: record.resumeContext ? { ...record.resumeContext } : undefined,
+});
+
 export class TaskRepository {
   private readonly tasks = new Map<string, Task>();
   private readonly platformTasks = new Map<string, PlatformTask>();
+  private readonly manualVerifications = new Map<string, ManualVerificationRecord>();
 
   async save(task: Task): Promise<void> {
     this.tasks.set(task.id, cloneTask(task));
@@ -40,5 +46,28 @@ export class TaskRepository {
       (candidate) => candidate.taskId === taskId && candidate.platform === platform,
     );
     return platformTask ? clonePlatformTask(platformTask) : null;
+  }
+
+  async saveManualVerification(record: ManualVerificationRecord): Promise<void> {
+    this.manualVerifications.set(record.id, cloneManualVerification(record));
+  }
+
+  async findManualVerificationsByTaskId(taskId: string): Promise<ManualVerificationRecord[]> {
+    return [...this.manualVerifications.values()]
+      .filter((record) => record.taskId === taskId)
+      .map(cloneManualVerification)
+      .sort((left, right) => left.requestedAt.localeCompare(right.requestedAt));
+  }
+
+  async findActiveManualVerification(
+    taskId: string,
+    platform: PlatformTask['platform'],
+  ): Promise<ManualVerificationRecord | null> {
+    const records = await this.findManualVerificationsByTaskId(taskId);
+    const activeRecord = records
+      .filter((record) => record.platform === platform && record.status === 'waiting')
+      .sort((left, right) => right.requestedAt.localeCompare(left.requestedAt))[0];
+
+    return activeRecord ? cloneManualVerification(activeRecord) : null;
   }
 }

@@ -41,6 +41,10 @@ export class BrowserAgent {
     return this.manager.requestManualVerification(request);
   }
 
+  getSession(platform: PlatformCode): BrowserSessionSnapshot | null {
+    return this.manager.getSession(platform);
+  }
+
   waitForManualVerification(platform: PlatformCode): Promise<void> {
     return this.manager.waitForManualVerification(platform);
   }

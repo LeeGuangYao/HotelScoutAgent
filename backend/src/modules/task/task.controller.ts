@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { apiError, notImplemented, ok } from '../../shared/http.js';
 import { TaskService } from './task.service.js';
-import type { PlatformCode, SearchCriteria, SortBy } from './task.types.js';
+import type { ManualVerificationContext, PlatformCode, SearchCriteria, SortBy } from './task.types.js';
 
 const PLATFORMS = new Set<PlatformCode>(['ctrip', 'booking', 'fliggy', 'meituan']);
 const SORT_OPTIONS = new Set<SortBy>(['price', 'trust', 'distance']);
@@ -14,6 +14,16 @@ type TaskParams = {
 
 type PlatformTaskParams = TaskParams & {
   platform: PlatformCode;
+};
+
+type ManualVerificationRequestBody = {
+  reason?: unknown;
+  screenshotPath?: unknown;
+  resumeContext?: unknown;
+};
+
+type ManualVerificationResumeBody = {
+  resumeContext?: unknown;
 };
 
 export const registerTaskRoutes = async (app: FastifyInstance): Promise<void> => {
@@ -69,6 +79,59 @@ export const registerTaskRoutes = async (app: FastifyInstance): Promise<void> =>
       return sendTaskError(reply, error);
     }
   });
+
+
+  app.post<{ Params: PlatformTaskParams; Body: ManualVerificationRequestBody }>(
+    '/api/tasks/:taskId/platforms/:platform/manual-verification',
+    async (request, reply) => {
+      if (!PLATFORMS.has(request.params.platform)) {
+        return reply.code(400).send(apiError('INVALID_PLATFORM', `Unsupported platform: ${request.params.platform}`));
+      }
+
+      const validationError = validateManualVerificationRequest(request.body);
+      if (validationError) {
+        return reply.code(400).send(apiError('INVALID_MANUAL_VERIFICATION_REQUEST', validationError));
+      }
+
+      try {
+        const detail = await taskService.requestManualVerification({
+          taskId: request.params.taskId,
+          platform: request.params.platform,
+          reason: request.body.reason as string,
+          screenshotPath: request.body.screenshotPath as string | undefined,
+          resumeContext: request.body.resumeContext as ManualVerificationContext | undefined,
+        });
+        return reply.send(ok(detail));
+      } catch (error) {
+        return sendTaskError(reply, error);
+      }
+    },
+  );
+
+  app.post<{ Params: PlatformTaskParams; Body: ManualVerificationResumeBody }>(
+    '/api/tasks/:taskId/platforms/:platform/manual-verification/resume',
+    async (request, reply) => {
+      if (!PLATFORMS.has(request.params.platform)) {
+        return reply.code(400).send(apiError('INVALID_PLATFORM', `Unsupported platform: ${request.params.platform}`));
+      }
+
+      const validationError = validateManualVerificationResume(request.body);
+      if (validationError) {
+        return reply.code(400).send(apiError('INVALID_MANUAL_VERIFICATION_RESUME', validationError));
+      }
+
+      try {
+        const detail = await taskService.resumeManualVerification({
+          taskId: request.params.taskId,
+          platform: request.params.platform,
+          resumeContext: request.body?.resumeContext as ManualVerificationContext | undefined,
+        });
+        return reply.send(ok(detail));
+      } catch (error) {
+        return sendTaskError(reply, error);
+      }
+    },
+  );
 
   app.get('/api/tasks/:taskId/results', async (_request, reply) => {
     return reply.code(501).send(notImplemented('Task results query'));
@@ -132,6 +195,44 @@ const validateSearchCriteria = (body: SearchCriteria | undefined): string | null
   return null;
 };
 
+
+const validateManualVerificationRequest = (body: ManualVerificationRequestBody | undefined): string | null => {
+  if (!body || typeof body !== 'object') {
+    return 'Request body is required.';
+  }
+
+  if (!body.reason || typeof body.reason !== 'string' || body.reason.trim().length === 0) {
+    return 'reason is required.';
+  }
+
+  if (body.screenshotPath !== undefined && typeof body.screenshotPath !== 'string') {
+    return 'screenshotPath must be a string when provided.';
+  }
+
+  if (body.resumeContext !== undefined && !isManualVerificationContext(body.resumeContext)) {
+    return 'resumeContext must be an object when provided.';
+  }
+
+  body.reason = body.reason.trim();
+  body.screenshotPath = body.screenshotPath?.trim();
+  body.resumeContext = body.resumeContext as ManualVerificationContext | undefined;
+  return null;
+};
+
+const validateManualVerificationResume = (body: ManualVerificationResumeBody | undefined): string | null => {
+  if (body?.resumeContext !== undefined && !isManualVerificationContext(body.resumeContext)) {
+    return 'resumeContext must be an object when provided.';
+  }
+
+  if (body) {
+    body.resumeContext = body.resumeContext as ManualVerificationContext | undefined;
+  }
+  return null;
+};
+
+const isManualVerificationContext = (value: unknown): value is ManualVerificationContext =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
 const isIsoDate = (value: unknown): value is string =>
   typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00.000Z`));
 
@@ -144,6 +245,10 @@ const sendTaskError = (reply: FastifyReply, error: unknown) => {
 
   if (message.startsWith('Platform task not found')) {
     return reply.code(404).send(apiError('PLATFORM_TASK_NOT_FOUND', message));
+  }
+
+  if (message.startsWith('Manual verification not found')) {
+    return reply.code(404).send(apiError('MANUAL_VERIFICATION_NOT_FOUND', message));
   }
 
   if (message.startsWith('Illegal')) {
