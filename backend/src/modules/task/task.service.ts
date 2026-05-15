@@ -387,6 +387,10 @@ export class TaskService {
     return this.scheduler.snapshot();
   }
 
+  close(): void {
+    this.repository.close();
+  }
+
   private async publishResultsCountChanged(taskId: string): Promise<void> {
     this.publishTaskEvent({
       id: randomUUID(),
