@@ -40,6 +40,10 @@ type ManualVerificationResumeBody = {
 export const registerTaskRoutes = async (
   app: FastifyInstance,
 ): Promise<void> => {
+  app.addHook("onClose", async () => {
+    taskService.close();
+  });
+
   app.post<{ Body: SearchCriteria }>("/api/tasks", async (request, reply) => {
     const validationError = validateSearchCriteria(request.body);
     if (validationError) {

@@ -10,3 +10,9 @@ export const getProjectRoot = (): string => {
 
 export const getScreenshotsRoot = (): string =>
   path.resolve(getProjectRoot(), "screenshots");
+
+export const getBackendDataRoot = (): string =>
+  path.resolve(getProjectRoot(), "backend", "data");
+
+export const getSqliteDatabasePath = (): string =>
+  path.resolve(getBackendDataRoot(), "app.sqlite");
