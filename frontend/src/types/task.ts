@@ -1,6 +1,6 @@
-export type PlatformCode = 'ctrip' | 'booking' | 'fliggy' | 'meituan';
+export type PlatformCode = "ctrip" | "booking" | "fliggy" | "meituan";
 
-export type SortBy = 'price' | 'trust' | 'distance';
+export type SortBy = "price" | "trust" | "distance";
 
 export type SearchCriteria = {
   destination: string;
@@ -16,27 +16,27 @@ export type SearchCriteria = {
 };
 
 export type TaskStatus =
-  | 'created'
-  | 'running'
-  | 'waiting_manual_verification'
-  | 'paused'
-  | 'completed'
-  | 'failed'
-  | 'cancelled';
+  | "created"
+  | "running"
+  | "waiting_manual_verification"
+  | "paused"
+  | "completed"
+  | "failed"
+  | "cancelled";
 
 export type PlatformTaskStatus =
-  | 'pending'
-  | 'opening'
-  | 'searching'
-  | 'collecting_list'
-  | 'confirming_detail'
-  | 'saving_evidence'
-  | 'waiting_manual_verification'
-  | 'skipped'
-  | 'completed'
-  | 'failed';
+  | "pending"
+  | "opening"
+  | "searching"
+  | "collecting_list"
+  | "confirming_detail"
+  | "saving_evidence"
+  | "waiting_manual_verification"
+  | "skipped"
+  | "completed"
+  | "failed";
 
-export type ManualVerificationStatus = 'waiting' | 'resumed';
+export type ManualVerificationStatus = "waiting" | "resumed";
 
 export type ManualVerificationContext = Record<string, unknown>;
 
@@ -94,11 +94,11 @@ export type PlatformTask = {
 
 export type Money = {
   amount: number;
-  currency: 'CNY' | 'JPY' | 'USD' | 'EUR';
+  currency: "CNY" | "JPY" | "USD" | "EUR";
   display: string;
 };
 
-export type TrustLevel = 'high' | 'medium' | 'low';
+export type TrustLevel = "high" | "medium" | "low";
 
 export type HotelResult = {
   id: string;
@@ -136,3 +136,71 @@ export type TaskDetail = {
   platforms: PlatformTask[];
   manualVerifications: ManualVerificationRecord[];
 };
+
+export type TaskEventType =
+  | "task_snapshot"
+  | "task_status_changed"
+  | "platform_status_changed"
+  | "manual_verification_requested"
+  | "manual_verification_resumed"
+  | "results_count_changed";
+
+export type TaskEventResultsSummary = {
+  totalResults: number;
+  detailPriceCount: number;
+  platformCount: number;
+  evidenceCompleteCount: number;
+  generatedAt: string;
+};
+
+export type TaskEventSnapshot = {
+  detail: TaskDetail;
+  resultsSummary: TaskEventResultsSummary;
+};
+
+export type TaskEvent =
+  | {
+      id: string;
+      taskId: string;
+      type: "task_snapshot";
+      occurredAt: string;
+      payload: TaskEventSnapshot;
+    }
+  | {
+      id: string;
+      taskId: string;
+      type: "task_status_changed";
+      occurredAt: string;
+      payload: { task: Task };
+    }
+  | {
+      id: string;
+      taskId: string;
+      type: "platform_status_changed";
+      occurredAt: string;
+      payload: {
+        platformTask: PlatformTask;
+        resultsSummary: TaskEventResultsSummary;
+      };
+    }
+  | {
+      id: string;
+      taskId: string;
+      type: "manual_verification_requested";
+      occurredAt: string;
+      payload: { manualVerification: ManualVerificationRecord };
+    }
+  | {
+      id: string;
+      taskId: string;
+      type: "manual_verification_resumed";
+      occurredAt: string;
+      payload: { manualVerification: ManualVerificationRecord };
+    }
+  | {
+      id: string;
+      taskId: string;
+      type: "results_count_changed";
+      occurredAt: string;
+      payload: { resultsSummary: TaskEventResultsSummary };
+    };
